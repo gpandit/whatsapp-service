@@ -1,0 +1,186 @@
+// Prisma Schema - WhatsApp Messaging Service
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"] // rhel for Lambda
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users / Customers ───────────────────────────────────────────────────────
+model Customer {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String   @unique // E.164 format: +1234567890
+  email       String?  @unique
+  isOptedIn   Boolean  @default(true)  // GDPR / WhatsApp opt-in consent
+  optedInAt   DateTime?
+  optedOutAt  DateTime?
+  metadata    Json?    // extra fields from your existing DB model
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages    Message[]
+  otpLogs     OtpLog[]
+  
+  @@map("customers")
+}
+
+// ─── WhatsApp Message Log ─────────────────────────────────────────────────────
+model Message {
+  id              String        @id @default(uuid())
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  
+  type            MessageType   // TRANSACTIONAL | MARKETING | OTP
+  status          MessageStatus @default(QUEUED)
+  
+  // WhatsApp specific
+  waMessageId     String?       // WhatsApp's returned message ID
+  templateName    String?       // template used (for template messages)
+  templateParams  Json?         // variables passed to template
+  freeText        String?       // for free-form messages (within 24hr window)
+  
+  // Tracking
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  failedAt        DateTime?
+  failReason      String?
+  
+  // Metadata
+  campaignId      String?       // for batch marketing messages
+  sentBy          String?       // admin user ID who triggered it
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("messages")
+}
+
+// ─── OTP Logs ─────────────────────────────────────────────────────────────────
+model OtpLog {
+  id          String     @id @default(uuid())
+  customerId  String
+  customer    Customer   @relation(fields: [customerId], references: [id])
+  phone       String
+  otp         String     // hashed OTP
+  expiresAt   DateTime
+  verifiedAt  DateTime?
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(3)
+  status      OtpStatus  @default(PENDING)
+  createdAt   DateTime   @default(now())
+
+  @@map("otp_logs")
+}
+
+// ─── Admin Users (platform users) ────────────────────────────────────────────
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         AdminRole @default(OPERATOR)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  campaigns    Campaign[]
+
+  @@map("admin_users")
+}
+
+// ─── Marketing Campaigns ──────────────────────────────────────────────────────
+model Campaign {
+  id              String         @id @default(uuid())
+  name            String
+  description     String?
+  templateName    String         // WhatsApp approved template
+  templateParams  Json?          // default params
+  status          CampaignStatus @default(DRAFT)
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  recipientCount  Int            @default(0)
+  successCount    Int            @default(0)
+  failCount       Int            @default(0)
+  createdBy       String
+  adminUser       AdminUser      @relation(fields: [createdBy], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@map("campaigns")
+}
+
+// ─── WhatsApp Templates Cache ─────────────────────────────────────────────────
+model WaTemplate {
+  id          String          @id @default(uuid())
+  name        String          @unique
+  language    String          @default("en_US")
+  category    TemplateCategory
+  components  Json            // template body/header/footer/buttons
+  status      String          // APPROVED | PENDING | REJECTED
+  syncedAt    DateTime        @default(now())
+
+  @@map("wa_templates")
+}
+
+// ─── Webhook Events ───────────────────────────────────────────────────────────
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  eventType   String   // messages, statuses, etc.
+  waMessageId String?
+  payload     Json     // raw payload from WhatsApp
+  processed   Boolean  @default(false)
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@map("webhook_events")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+enum MessageType {
+  TRANSACTIONAL
+  MARKETING
+  OTP
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
+}
+
+enum OtpStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  EXHAUSTED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATOR
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum TemplateCategory {
+  AUTHENTICATION
+  MARKETING
+  UTILITY
+}

@@ -1,0 +1,24 @@
+{
+  "name": "whatsapp-infra",
+  "version": "1.0.0",
+  "description": "AWS CDK Infrastructure for WhatsApp Lambda Service",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "cdk": "cdk",
+    "deploy:dev":  "cdk deploy --context env=dev  --require-approval never",
+    "deploy:prod": "cdk deploy --context env=prod --require-approval broadening",
+    "diff": "cdk diff",
+    "synth": "cdk synth",
+    "destroy:dev": "cdk destroy --context env=dev"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.116.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "aws-cdk": "^2.116.0",
+    "typescript": "^5.3.2"
+  }
+}

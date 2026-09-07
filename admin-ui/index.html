@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    .tab-active { @apply border-b-2 border-green-500 text-green-600; }
+    .badge-sent      { background:#dcfce7; color:#166534; }
+    .badge-delivered { background:#dbeafe; color:#1e40af; }
+    .badge-read      { background:#ede9fe; color:#5b21b6; }
+    .badge-failed    { background:#fee2e2; color:#991b1b; }
+    .badge-queued    { background:#fef9c3; color:#854d0e; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- ── Login Screen ─────────────────────────────────────────────────────── -->
+  <div id="loginScreen" class="flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-96">
+      <div class="flex items-center gap-3 mb-8">
+        <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+          <i class="fab fa-whatsapp text-white text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-gray-800">WhatsApp Admin</h1>
+          <p class="text-sm text-gray-500">Messaging Platform</p>
+        </div>
+      </div>
+      <div id="loginError" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input id="loginEmail" type="email" placeholder="admin@company.com"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input id="loginPassword" type="password" placeholder="••••••••"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+            onkeypress="if(event.key==='Enter') login()">
+        </div>
+        <button onclick="login()" id="loginBtn"
+          class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 rounded-lg transition">
+          Sign In
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main App ─────────────────────────────────────────────────────────── -->
+  <div id="mainApp" class="hidden">
+
+    <!-- Sidebar -->
+    <div class="flex h-screen">
+      <aside class="w-64 bg-gray-900 text-white flex flex-col">
+        <div class="p-6 border-b border-gray-700">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+              <i class="fab fa-whatsapp text-white"></i>
+            </div>
+            <div>
+              <p class="font-bold text-sm">WhatsApp Admin</p>
+              <p id="adminName" class="text-xs text-gray-400"></p>
+            </div>
+          </div>
+        </div>
+        <nav class="flex-1 p-4 space-y-1">
+          <a onclick="showTab('dashboard')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-700 text-sm" data-tab="dashboard">
+            <i class="fas fa-chart-bar w-4"></i> Dashboard
+          </a>
+          <a onclick="showTab('customers')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-700 text-sm" data-tab="customers">
+            <i class="fas fa-users w-4"></i> Customers
+          </a>
+          <a onclick="showTab('send')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-700 text-sm" data-tab="send">
+            <i class="fas fa-paper-plane w-4"></i> Send Message
+          </a>
+          <a onclick="showTab('broadcast')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-700 text-sm" data-tab="broadcast">
+            <i class="fas fa-bullhorn w-4"></i> Broadcast
+          </a>
+          <a onclick="showTab('messages')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-700 text-sm" data-tab="messages">
+            <i class="fas fa-history w-4"></i> Message Log
+          </a>
+          <a onclick="showTab('templates')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-700 text-sm" data-tab="templates">
+            <i class="fas fa-file-alt w-4"></i> Templates
+          </a>
+        </nav>
+        <div class="p-4 border-t border-gray-700">
+          <button onclick="logout()" class="flex items-center gap-2 text-gray-400 hover:text-white text-sm">
+            <i class="fas fa-sign-out-alt"></i> Logout
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 overflow-auto bg-gray-50">
+
+        <!-- ── Dashboard ──────────────────────────────────────────────── -->
+        <div id="tab-dashboard" class="tab-content p-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">Dashboard</h2>
+          <div class="grid grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl p-5 shadow-sm">
+              <p class="text-sm text-gray-500">Total Customers</p>
+              <p id="stat-total-customers" class="text-3xl font-bold text-gray-800">—</p>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm">
+              <p class="text-sm text-gray-500">Opted In</p>
+              <p id="stat-opted-in" class="text-3xl font-bold text-green-600">—</p>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm">
+              <p class="text-sm text-gray-500">Sent Today</p>
+              <p id="stat-sent-today" class="text-3xl font-bold text-blue-600">—</p>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm">
+              <p class="text-sm text-gray-500">Failed Today</p>
+              <p id="stat-failed-today" class="text-3xl font-bold text-red-500">—</p>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm p-6">
+            <h3 class="font-semibold text-gray-700 mb-4">Recent Messages</h3>
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-gray-500 border-b">
+                <th class="pb-2">Customer</th><th class="pb-2">Phone</th>
+                <th class="pb-2">Type</th><th class="pb-2">Status</th><th class="pb-2">Time</th>
+              </tr></thead>
+              <tbody id="recent-messages-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Customers ──────────────────────────────────────────────── -->
+        <div id="tab-customers" class="tab-content hidden p-8">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Customers</h2>
+            <div class="flex gap-3">
+              <input id="customerSearch" type="text" placeholder="Search name, phone..."
+                class="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                oninput="searchCustomers()">
+              <button onclick="showAddCustomer()"
+                class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600">
+                + Add Customer
+              </button>
+            </div>
+          </div>
+
+          <!-- Add Customer Form -->
+          <div id="addCustomerForm" class="hidden bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h3 class="font-semibold mb-4">Add New Customer</h3>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="text-sm text-gray-600">Name *</label>
+                <input id="newCustName" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Phone (E.164) *</label>
+                <input id="newCustPhone" type="text" placeholder="+91XXXXXXXXXX" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Email</label>
+                <input id="newCustEmail" type="email" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+              </div>
+            </div>
+            <div class="mt-4 flex gap-3">
+              <button onclick="addCustomer()" class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm">Save</button>
+              <button onclick="document.getElementById('addCustomerForm').classList.add('hidden')"
+                class="text-gray-600 px-4 py-2 text-sm">Cancel</button>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table class="w-full text-sm">
+              <thead><tr class="bg-gray-50 text-gray-500 text-left border-b">
+                <th class="px-4 py-3">Name</th><th class="px-4 py-3">Phone</th>
+                <th class="px-4 py-3">Email</th><th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3">Messages</th><th class="px-4 py-3">Actions</th>
+              </tr></thead>
+              <tbody id="customers-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Send Individual Message ────────────────────────────────── -->
+        <div id="tab-send" class="tab-content hidden p-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">Send Message</h2>
+          <div class="bg-white rounded-xl shadow-sm p-6 max-w-xl">
+            <div id="sendMsgAlert" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm font-medium text-gray-700">Customer Phone (E.164)</label>
+                <input id="sendPhone" type="text" placeholder="+91XXXXXXXXXX"
+                  class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-700">Message Type</label>
+                <select id="sendMsgType" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="TRANSACTIONAL">Transactional</option>
+                  <option value="MARKETING">Marketing</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-700">Template Name</label>
+                <select id="sendTemplateName" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Loading templates…</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-700">Template Variables (JSON)</label>
+                <textarea id="sendComponents" rows="4"
+                  class="mt-1 w-full border rounded-lg px-3 py-2 text-sm font-mono"
+                  placeholder='[{"type":"body","parameters":[{"type":"text","text":"John"}]}]'></textarea>
+                <p class="text-xs text-gray-400 mt-1">Leave empty if template has no variables</p>
+              </div>
+              <button onclick="sendMessage()"
+                class="w-full bg-green-500 text-white py-2 rounded-lg font-semibold hover:bg-green-600">
+                <i class="fab fa-whatsapp mr-2"></i>Send Message
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Broadcast Campaign ─────────────────────────────────────── -->
+        <div id="tab-broadcast" class="tab-content hidden p-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">Broadcast Campaign</h2>
+          <div class="bg-white rounded-xl shadow-sm p-6 max-w-2xl">
+            <div id="broadcastAlert" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm font-medium text-gray-700">Campaign Name *</label>
+                <input id="bcName" type="text" placeholder="Summer Sale 2025"
+                  class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-700">Description</label>
+                <input id="bcDesc" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-700">Template *</label>
+                <select id="bcTemplate" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">Select template…</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-700">Template Variables (JSON)</label>
+                <textarea id="bcComponents" rows="4" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm font-mono"
+                  placeholder='[{"type":"body","parameters":[{"type":"text","text":"20%"}]}]'></textarea>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-700">Recipients</label>
+                <div class="mt-2 flex gap-4">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="recipientType" value="all" checked onchange="toggleRecipients(this)">
+                    <span class="text-sm">All opted-in customers</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="recipientType" value="specific" onchange="toggleRecipients(this)">
+                    <span class="text-sm">Specific phones</span>
+                  </label>
+                </div>
+                <textarea id="bcPhones" rows="3" class="hidden mt-2 w-full border rounded-lg px-3 py-2 text-sm"
+                  placeholder="One phone per line: +1234567890"></textarea>
+              </div>
+
+              <!-- Preview -->
+              <div class="bg-gray-50 rounded-lg p-4 border border-dashed border-gray-300">
+                <p class="text-xs text-gray-500 mb-2">⚠️ This will send WhatsApp messages to real customers. Verify before sending.</p>
+                <button onclick="broadcastMessages()" id="broadcastBtn"
+                  class="w-full bg-orange-500 text-white py-2 rounded-lg font-semibold hover:bg-orange-600">
+                  <i class="fas fa-bullhorn mr-2"></i>Send Broadcast
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Message Log ────────────────────────────────────────────── -->
+        <div id="tab-messages" class="tab-content hidden p-8">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Message Log</h2>
+            <div class="flex gap-3">
+              <select id="msgTypeFilter" onchange="loadMessages()" class="border rounded-lg px-3 py-2 text-sm">
+                <option value="">All Types</option>
+                <option value="OTP">OTP</option>
+                <option value="TRANSACTIONAL">Transactional</option>
+                <option value="MARKETING">Marketing</option>
+              </select>
+              <select id="msgStatusFilter" onchange="loadMessages()" class="border rounded-lg px-3 py-2 text-sm">
+                <option value="">All Status</option>
+                <option value="SENT">Sent</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="READ">Read</option>
+                <option value="FAILED">Failed</option>
+              </select>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table class="w-full text-sm">
+              <thead><tr class="bg-gray-50 text-gray-500 text-left border-b">
+                <th class="px-4 py-3">Customer</th><th class="px-4 py-3">Phone</th>
+                <th class="px-4 py-3">Type</th><th class="px-4 py-3">Template</th>
+                <th class="px-4 py-3">Status</th><th class="px-4 py-3">Sent At</th>
+              </tr></thead>
+              <tbody id="messages-body"></tbody>
+            </table>
+            <div class="p-4 flex justify-between items-center border-t">
+              <span id="msg-pagination-info" class="text-sm text-gray-500"></span>
+              <div class="flex gap-2">
+                <button onclick="prevMsgPage()" class="px-3 py-1 border rounded text-sm">← Prev</button>
+                <button onclick="nextMsgPage()" class="px-3 py-1 border rounded text-sm">Next →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Templates ──────────────────────────────────────────────── -->
+        <div id="tab-templates" class="tab-content hidden p-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">WhatsApp Templates</h2>
+          <div id="templates-grid" class="grid grid-cols-2 gap-4"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
